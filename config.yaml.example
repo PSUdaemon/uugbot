@@ -1,0 +1,9 @@
+general:
+  name: UUGBot
+  server: irc.freenode.net:6667
+  channels:
+    - name: "#foo"
+      pass: "barbaz"
+
+forecast:
+  key: XXXXXXXXXXXXXXXX

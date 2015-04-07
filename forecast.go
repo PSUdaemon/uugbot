@@ -25,7 +25,9 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/karlseguin/rcache"
 	"github.com/nickvanw/ircx"
 	"github.com/sorcix/irc"
 )
@@ -73,6 +75,33 @@ type WeatherReport struct {
 	Currently Current `json:"currently"`
 }
 
+var cache *rcache.Cache
+
+func fetcher(key string) interface{} {
+	var z ZipInfo
+
+	log.Println("Looking up coordinates for zip:", key)
+	resp, err := http.Get(fmt.Sprintf("http://api.zippopotam.us/us/%s", key))
+
+	if err != nil {
+		return nil
+	}
+
+	defer resp.Body.Close()
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&z)
+
+	if err != nil {
+		return nil
+	}
+
+	return &z
+}
+
+func init() {
+	cache = rcache.New(fetcher, time.Hour*24*7)
+}
+
 func GetWeather(s ircx.Sender, message *irc.Message) {
 	if len(message.Trailing) == 5 {
 		if _, err := strconv.Atoi(message.Trailing); err == nil {
@@ -87,31 +116,21 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 				Trailing: message.Prefix.Name,
 			}
 
-			resp, err := http.Get(fmt.Sprint("http://api.zippopotam.us/us/", message.Trailing))
-			if err != nil {
-				// handle error
-				return
-			}
-			defer resp.Body.Close()
+			z := cache.Get(message.Trailing).(*ZipInfo)
 
-			dec := json.NewDecoder(resp.Body)
-
-			var z ZipInfo
-			err = dec.Decode(&z)
-
-			if err == nil && z.Places != nil {
-				resp2, err := http.Get(fmt.Sprint("https://api.forecast.io/forecast/", config.Forecast.Key, "/",
+			if z != nil && z.Places != nil {
+				resp, err := http.Get(fmt.Sprint("https://api.forecast.io/forecast/", config.Forecast.Key, "/",
 					z.Places[0].Latitude, ",", z.Places[0].Longitude, "?exclude=minutely,hourly,daily,flags"))
 				if err != nil {
 					// handle error
 					return
 				}
-				defer resp2.Body.Close()
+				defer resp.Body.Close()
 
-				dec2 := json.NewDecoder(resp2.Body)
+				dec := json.NewDecoder(resp.Body)
 
 				var w WeatherReport
-				err = dec2.Decode(&w)
+				err = dec.Decode(&w)
 
 				m.Trailing = fmt.Sprint(m.Trailing, ": ", z.Places[0].PlaceName, ", ", z.Places[0].StateAbbr,
 					" (", z.Places[0].Latitude, ", ", z.Places[0].Longitude, "): ",

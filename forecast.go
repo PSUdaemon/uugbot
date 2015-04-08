@@ -67,12 +67,27 @@ type Current struct {
 	Ozone                float64 `json:"ozone"`
 }
 
+type Minutely struct {
+	Summary string `json:"summary"`
+}
+
+type Hourly struct {
+	Summary string `json:"summary"`
+}
+
+type Daily struct {
+	Summary string `json:"summary"`
+}
+
 type WeatherReport struct {
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Timezone  string  `json:"timezone"`
-	Offset    float64 `json:"offset"`
-	Currently Current `json:"currently"`
+	Latitude  float64  `json:"latitude"`
+	Longitude float64  `json:"longitude"`
+	Timezone  string   `json:"timezone"`
+	Offset    float64  `json:"offset"`
+	Currently Current  `json:"currently"`
+	Minutely  Minutely `json:"minutely"`
+	Hourly    Hourly   `json:"hourly"`
+	Daily     Daily    `json:"daily"`
 }
 
 var cache *rcache.Cache
@@ -111,16 +126,15 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 			}
 
 			m := &irc.Message{
-				Command:  irc.PRIVMSG,
-				Params:   p,
-				Trailing: message.Prefix.Name,
+				Command: irc.PRIVMSG,
+				Params:  p,
 			}
 
 			z := cache.Get(message.Trailing).(*ZipInfo)
 
 			if z != nil && z.Places != nil {
 				resp, err := http.Get(fmt.Sprint("https://api.forecast.io/forecast/", config.Forecast.Key, "/",
-					z.Places[0].Latitude, ",", z.Places[0].Longitude, "?exclude=minutely,hourly,daily,flags"))
+					z.Places[0].Latitude, ",", z.Places[0].Longitude, "?exclude=flags"))
 				if err != nil {
 					// handle error
 					return
@@ -132,16 +146,33 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 				var w WeatherReport
 				err = dec.Decode(&w)
 
-				m.Trailing = fmt.Sprint(m.Trailing, ": ", z.Places[0].PlaceName, ", ", z.Places[0].StateAbbr,
-					" (", z.Places[0].Latitude, ", ", z.Places[0].Longitude, "): ",
+				l, _ := time.LoadLocation(w.Timezone)
+
+				t := time.Unix(w.Currently.Time, 0).In(l)
+
+				log.Println("Sending weather for", message.Trailing)
+
+				m.Trailing = fmt.Sprint(message.Prefix.Name, ": ", z.Places[0].PlaceName, ", ", z.Places[0].StateAbbr,
+					" (", z.Places[0].Latitude, ", ", z.Places[0].Longitude, ") ", t, " - ",
 					w.Currently.Temperature, "F (feels like ", w.Currently.ApparentTemperature, "F) - ",
+					w.Currently.Summary)
+				s.Send(m)
+
+				m.Trailing = fmt.Sprint(message.Prefix.Name, ": ",
 					w.Currently.Humidity*100, "% Humidity - ",
 					"Wind from ", w.Currently.WindBearing, "° at ", w.Currently.WindSpeed, "MPH - ",
 					"Visibility ", w.Currently.Visibility, " Miles - ",
 					"Cloud Cover ", w.Currently.CloudCover*100, "% - ",
-					"Precipitation Probability ", w.Currently.PrecipProbability*100, "% - ",
-					w.Currently.Summary)
-				log.Println("Sending weather for", message.Trailing)
+					"Precipitation Probability ", w.Currently.PrecipProbability*100, "%")
+				s.Send(m)
+
+				m.Trailing = fmt.Sprint(message.Prefix.Name, ": Next Hour - ", w.Minutely.Summary)
+				s.Send(m)
+
+				m.Trailing = fmt.Sprint(message.Prefix.Name, ": Next Day - ", w.Hourly.Summary)
+				s.Send(m)
+
+				m.Trailing = fmt.Sprint(message.Prefix.Name, ": Next Week - ", w.Daily.Summary)
 				s.Send(m)
 			}
 		}

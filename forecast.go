@@ -166,13 +166,7 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 					"Precipitation Probability ", w.Currently.PrecipProbability*100, "%")
 				s.Send(m)
 
-				m.Trailing = fmt.Sprint(message.Prefix.Name, ": Next Hour - ", w.Minutely.Summary)
-				s.Send(m)
-
-				m.Trailing = fmt.Sprint(message.Prefix.Name, ": Next Day - ", w.Hourly.Summary)
-				s.Send(m)
-
-				m.Trailing = fmt.Sprint(message.Prefix.Name, ": Next Week - ", w.Daily.Summary)
+				m.Trailing = fmt.Sprint(message.Prefix.Name, ": ", w.Minutely.Summary, " ", w.Hourly.Summary, " ", w.Daily.Summary)
 				s.Send(m)
 			}
 		}

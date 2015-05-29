@@ -37,11 +37,11 @@ func getURL(s ircx.Sender, message *irc.Message, word string) {
 		resp, err := http.Head(url.String())
 		if err == nil {
 			resp.Body.Close()
-			if resp.StatusCode == 200 && strings.Contains(resp.Header.Get("content-type"), "text/html") && resp.ContentLength < 1024*1024 {
+			if resp.StatusCode == http.StatusOK && strings.Contains(resp.Header.Get("content-type"), "text/html") && resp.ContentLength < 1024*1024 {
 				resp2, err2 := http.Get(url.String())
 				if err2 == nil {
 					defer resp2.Body.Close()
-					if resp.StatusCode == 200 && strings.Contains(resp.Header.Get("content-type"), "text/html") {
+					if resp.StatusCode == http.StatusOK && strings.Contains(resp.Header.Get("content-type"), "text/html") {
 						z := html.NewTokenizer(resp2.Body)
 						for {
 							tt := z.Next()
@@ -56,7 +56,7 @@ func getURL(s ircx.Sender, message *irc.Message, word string) {
 										p = []string{message.Prefix.Name}
 									}
 
-									title := fmt.Sprintf("Title: %s", z.Token().Data)
+									title := fmt.Sprintf("Title: %s", strings.TrimSpace(strings.Replace(z.Token().Data, "\n", "", -1)))
 
 									log.Println("Sending HTML", title)
 									s.Send(&irc.Message{

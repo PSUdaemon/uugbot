@@ -99,6 +99,7 @@ func fetcher(key string) interface{} {
 	resp, err := http.Get(fmt.Sprintf("http://api.zippopotam.us/us/%s", key))
 
 	if err != nil {
+		log.Printf("Lookup failed for zip: %s (%s)\n", key, err)
 		return nil
 	}
 
@@ -107,6 +108,7 @@ func fetcher(key string) interface{} {
 	err = dec.Decode(&z)
 
 	if err != nil {
+		log.Printf("Unable to parse result for zip: %s (%s)\n", key, err)
 		return nil
 	}
 
@@ -130,44 +132,49 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 				Params:  p,
 			}
 
-			z := cache.Get(message.Trailing).(*ZipInfo)
+			zl := cache.Get(message.Trailing)
 
-			if z != nil && z.Places != nil {
-				resp, err := http.Get(fmt.Sprint("https://api.forecast.io/forecast/", config.Forecast.Key, "/",
-					z.Places[0].Latitude, ",", z.Places[0].Longitude, "?exclude=flags"))
-				if err != nil {
-					// handle error
-					return
+			if zl != nil {
+				z := zl.(*ZipInfo)
+				if z.Places != nil {
+					resp, err := http.Get(fmt.Sprint("https://api.forecast.io/forecast/", config.Forecast.Key, "/",
+						z.Places[0].Latitude, ",", z.Places[0].Longitude, "?exclude=flags"))
+					if err != nil {
+						// handle error
+						return
+					}
+					defer resp.Body.Close()
+
+					dec := json.NewDecoder(resp.Body)
+
+					var w WeatherReport
+					err = dec.Decode(&w)
+
+					l, _ := time.LoadLocation(w.Timezone)
+
+					t := time.Unix(w.Currently.Time, 0).In(l)
+
+					log.Println("Sending weather for", message.Trailing)
+
+					m.Trailing = fmt.Sprint(message.Prefix.Name, ": ", z.Places[0].PlaceName, ", ", z.Places[0].StateAbbr,
+						" (", z.Places[0].Latitude, ", ", z.Places[0].Longitude, ") ", t, " - ",
+						w.Currently.Temperature, "F (feels like ", w.Currently.ApparentTemperature, "F) - ",
+						w.Currently.Summary)
+					s.Send(m)
+
+					m.Trailing = fmt.Sprint(message.Prefix.Name, ": ",
+						w.Currently.Humidity*100, "% Humidity - ",
+						"Wind from ", w.Currently.WindBearing, "° at ", w.Currently.WindSpeed, "MPH - ",
+						"Visibility ", w.Currently.Visibility, " Miles - ",
+						"Cloud Cover ", w.Currently.CloudCover*100, "% - ",
+						"Precipitation Probability ", w.Currently.PrecipProbability*100, "%")
+					s.Send(m)
+
+					m.Trailing = fmt.Sprint(message.Prefix.Name, ": ", w.Minutely.Summary, " ", w.Hourly.Summary, " ", w.Daily.Summary)
+					s.Send(m)
+				} else {
+					log.Println("No data returned for zip:", message.Trailing)
 				}
-				defer resp.Body.Close()
-
-				dec := json.NewDecoder(resp.Body)
-
-				var w WeatherReport
-				err = dec.Decode(&w)
-
-				l, _ := time.LoadLocation(w.Timezone)
-
-				t := time.Unix(w.Currently.Time, 0).In(l)
-
-				log.Println("Sending weather for", message.Trailing)
-
-				m.Trailing = fmt.Sprint(message.Prefix.Name, ": ", z.Places[0].PlaceName, ", ", z.Places[0].StateAbbr,
-					" (", z.Places[0].Latitude, ", ", z.Places[0].Longitude, ") ", t, " - ",
-					w.Currently.Temperature, "F (feels like ", w.Currently.ApparentTemperature, "F) - ",
-					w.Currently.Summary)
-				s.Send(m)
-
-				m.Trailing = fmt.Sprint(message.Prefix.Name, ": ",
-					w.Currently.Humidity*100, "% Humidity - ",
-					"Wind from ", w.Currently.WindBearing, "° at ", w.Currently.WindSpeed, "MPH - ",
-					"Visibility ", w.Currently.Visibility, " Miles - ",
-					"Cloud Cover ", w.Currently.CloudCover*100, "% - ",
-					"Precipitation Probability ", w.Currently.PrecipProbability*100, "%")
-				s.Send(m)
-
-				m.Trailing = fmt.Sprint(message.Prefix.Name, ": ", w.Minutely.Summary, " ", w.Hourly.Summary, " ", w.Daily.Summary)
-				s.Send(m)
 			}
 		}
 	}

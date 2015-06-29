@@ -122,9 +122,14 @@ func init() {
 func GetWeather(s ircx.Sender, message *irc.Message) {
 	if len(message.Trailing) == 5 {
 		if _, err := strconv.Atoi(message.Trailing); err == nil {
-			p := message.Params
-			if p[0] == config.General.Name {
+			var p []string
+			var prefix string
+
+			if message.Params[0] == config.General.Name {
 				p = []string{message.Prefix.Name}
+			} else {
+				p = message.Params
+				prefix = fmt.Sprint(message.Prefix.Name, ": ")
 			}
 
 			m := &irc.Message{
@@ -156,13 +161,13 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 
 					log.Println("Sending weather for", message.Trailing)
 
-					m.Trailing = fmt.Sprint(message.Prefix.Name, ": ", z.Places[0].PlaceName, ", ", z.Places[0].StateAbbr,
+					m.Trailing = fmt.Sprint(prefix, z.Places[0].PlaceName, ", ", z.Places[0].StateAbbr,
 						" (", z.Places[0].Latitude, ", ", z.Places[0].Longitude, ") ", t, " - ",
 						w.Currently.Temperature, "F (feels like ", w.Currently.ApparentTemperature, "F) - ",
 						w.Currently.Summary)
 					s.Send(m)
 
-					m.Trailing = fmt.Sprint(message.Prefix.Name, ": ",
+					m.Trailing = fmt.Sprint(prefix,
 						w.Currently.Humidity*100, "% Humidity - ",
 						"Wind from ", w.Currently.WindBearing, "° at ", w.Currently.WindSpeed, "MPH - ",
 						"Visibility ", w.Currently.Visibility, " Miles - ",
@@ -170,7 +175,7 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 						"Precipitation Probability ", w.Currently.PrecipProbability*100, "%")
 					s.Send(m)
 
-					m.Trailing = fmt.Sprint(message.Prefix.Name, ": ", w.Minutely.Summary, " ", w.Hourly.Summary, " ", w.Daily.Summary)
+					m.Trailing = fmt.Sprint(prefix, w.Minutely.Summary, " ", w.Hourly.Summary, " ", w.Daily.Summary)
 					s.Send(m)
 				} else {
 					log.Println("No data returned for zip:", message.Trailing)

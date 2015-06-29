@@ -33,11 +33,11 @@ import (
 )
 
 type PlaceInfo struct {
-	PlaceName string  `json:"place name"`
-	State     string  `json:"state"`
-	StateAbbr string  `json:"state abbreviation"`
-	Latitude  float64 `json:"latitude,string"`
-	Longitude float64 `json:"longitude,string"`
+	PlaceName string `json:"place name"`
+	State     string `json:"state"`
+	StateAbbr string `json:"state abbreviation"`
+	Latitude  string `json:"latitude"`
+	Longitude string `json:"longitude"`
 }
 
 type ZipInfo struct {
@@ -60,7 +60,7 @@ type Current struct {
 	DewPoint             float64 `json:"dewPoint"`
 	Humidity             float64 `json:"humidity"`
 	WindSpeed            float64 `json:"windSpeed"`
-	WindBearing          float64 `json:"windBearing"`
+	WindBearing          int     `json:"windBearing"`
 	Visibility           float64 `json:"visibility"`
 	CloudCover           float64 `json:"cloudCover"`
 	Pressure             float64 `json:"pressure"`
@@ -161,21 +161,22 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 
 					log.Println("Sending weather for", message.Trailing)
 
-					m.Trailing = fmt.Sprint(prefix, z.Places[0].PlaceName, ", ", z.Places[0].StateAbbr,
-						" (", z.Places[0].Latitude, ", ", z.Places[0].Longitude, ") ", t, " - ",
-						w.Currently.Temperature, "F (feels like ", w.Currently.ApparentTemperature, "F) - ",
+					m.Trailing = fmt.Sprintf("%s%s, %s (%s, %s) %s - %.2fF (feels like %.2fF) - %s",
+						prefix, z.Places[0].PlaceName, z.Places[0].StateAbbr,
+						z.Places[0].Latitude, z.Places[0].Longitude, t,
+						w.Currently.Temperature, w.Currently.ApparentTemperature,
 						w.Currently.Summary)
 					s.Send(m)
 
-					m.Trailing = fmt.Sprint(prefix,
-						w.Currently.Humidity*100, "% Humidity - ",
-						"Wind from ", w.Currently.WindBearing, "° at ", w.Currently.WindSpeed, "MPH - ",
-						"Visibility ", w.Currently.Visibility, " Miles - ",
-						"Cloud Cover ", w.Currently.CloudCover*100, "% - ",
-						"Precipitation Probability ", w.Currently.PrecipProbability*100, "%")
+					m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fMPH - Visibility %.2f Miles - Cloud Cover %d%% - Precipitation Probability %d%%",
+						prefix, int(w.Currently.Humidity*100),
+						w.Currently.WindBearing, w.Currently.WindSpeed,
+						w.Currently.Visibility,
+						int(w.Currently.CloudCover*100),
+						int(w.Currently.PrecipProbability*100))
 					s.Send(m)
 
-					m.Trailing = fmt.Sprint(prefix, w.Minutely.Summary, " ", w.Hourly.Summary, " ", w.Daily.Summary)
+					m.Trailing = fmt.Sprintf("%s%s %s %s", prefix, w.Minutely.Summary, w.Hourly.Summary, w.Daily.Summary)
 					s.Send(m)
 				} else {
 					log.Println("No data returned for zip:", message.Trailing)

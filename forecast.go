@@ -161,14 +161,14 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 
 					log.Println("Sending weather for", message.Trailing)
 
-					m.Trailing = fmt.Sprintf("%s%s, %s (%.4f, %.4f) %s - %.2fF (feels like %.2fF) - %s",
+					m.Trailing = fmt.Sprintf("%s%s, %s (%.4f, %.4f) %s - %.2f°F (feels like %.2f°F) - %s",
 						prefix, z.Places[0].PlaceName, z.Places[0].StateAbbr,
 						z.Places[0].Latitude, z.Places[0].Longitude, t,
 						w.Currently.Temperature, w.Currently.ApparentTemperature,
 						w.Currently.Summary)
 					s.Send(m)
 
-					m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fMPH - Visibility %.2f Miles - Cloud Cover %d%% - Precipitation Probability %d%%",
+					m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fmph - Visibility %.2f Miles - Cloud Cover %d%% - Precipitation Probability %d%%",
 						prefix, int(w.Currently.Humidity*100),
 						w.Currently.WindBearing, w.Currently.WindSpeed,
 						w.Currently.Visibility,

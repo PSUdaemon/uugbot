@@ -33,11 +33,11 @@ import (
 )
 
 type PlaceInfo struct {
-	PlaceName string `json:"place name"`
-	State     string `json:"state"`
-	StateAbbr string `json:"state abbreviation"`
-	Latitude  string `json:"latitude"`
-	Longitude string `json:"longitude"`
+	PlaceName string  `json:"place name"`
+	State     string  `json:"state"`
+	StateAbbr string  `json:"state abbreviation"`
+	Latitude  float64 `json:"latitude,string"`
+	Longitude float64 `json:"longitude,string"`
 }
 
 type ZipInfo struct {
@@ -142,8 +142,8 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 			if zl != nil {
 				z := zl.(*ZipInfo)
 				if z.Places != nil {
-					resp, err := http.Get(fmt.Sprint("https://api.forecast.io/forecast/", config.Forecast.Key, "/",
-						z.Places[0].Latitude, ",", z.Places[0].Longitude, "?exclude=flags"))
+					resp, err := http.Get(fmt.Sprintf("https://api.forecast.io/forecast/%s/%.4f,%.4f?exclude=flags",
+						config.Forecast.Key, z.Places[0].Latitude, z.Places[0].Longitude))
 					if err != nil {
 						// handle error
 						return
@@ -161,7 +161,7 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 
 					log.Println("Sending weather for", message.Trailing)
 
-					m.Trailing = fmt.Sprintf("%s%s, %s (%s, %s) %s - %.2fF (feels like %.2fF) - %s",
+					m.Trailing = fmt.Sprintf("%s%s, %s (%.4f, %.4f) %s - %.2fF (feels like %.2fF) - %s",
 						prefix, z.Places[0].PlaceName, z.Places[0].StateAbbr,
 						z.Places[0].Latitude, z.Places[0].Longitude, t,
 						w.Currently.Temperature, w.Currently.ApparentTemperature,

@@ -32,19 +32,17 @@ import (
 	"github.com/sorcix/irc"
 )
 
-type PlaceInfo struct {
-	PlaceName string  `json:"place name"`
-	State     string  `json:"state"`
-	StateAbbr string  `json:"state abbreviation"`
-	Latitude  float64 `json:"latitude,string"`
-	Longitude float64 `json:"longitude,string"`
-}
-
 type ZipInfo struct {
-	PostCode    string      `json:"post code"`
-	Country     string      `json:"country"`
-	CountryAbbr string      `json:"country abbreviation"`
-	Places      []PlaceInfo `json:"places"`
+	Country     string `json:"country"`
+	CountryAbbr string `json:"country abbreviation"`
+	PostCode    string `json:"post code"`
+	Places      []struct {
+		Latitude  float64 `json:"latitude,string"`
+		Longitude float64 `json:"longitude,string"`
+		PlaceName string  `json:"place name"`
+		State     string  `json:"state"`
+		StateAbbr string  `json:"state abbreviation"`
+	} `json:"places"`
 }
 
 type WeatherReport struct {

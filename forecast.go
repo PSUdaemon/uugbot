@@ -47,47 +47,100 @@ type ZipInfo struct {
 	Places      []PlaceInfo `json:"places"`
 }
 
-type Current struct {
-	Time                 int64   `json:"time"`
-	Summary              string  `json:"summary"`
-	Icon                 string  `json:"icon"`
-	NearestStormDistance float64 `json:"nearestStormDistance"`
-	NearestStormBearing  float64 `json:"nearestStormBearing"`
-	PrecipIntensity      float64 `json:"precipIntensity"`
-	PrecipProbability    float64 `json:"precipProbability"`
-	Temperature          float64 `json:"temperature"`
-	ApparentTemperature  float64 `json:"apparentTemperature"`
-	DewPoint             float64 `json:"dewPoint"`
-	Humidity             float64 `json:"humidity"`
-	WindSpeed            float64 `json:"windSpeed"`
-	WindBearing          int     `json:"windBearing"`
-	Visibility           float64 `json:"visibility"`
-	CloudCover           float64 `json:"cloudCover"`
-	Pressure             float64 `json:"pressure"`
-	Ozone                float64 `json:"ozone"`
-}
-
-type Minutely struct {
-	Summary string `json:"summary"`
-}
-
-type Hourly struct {
-	Summary string `json:"summary"`
-}
-
-type Daily struct {
-	Summary string `json:"summary"`
-}
-
 type WeatherReport struct {
-	Latitude  float64  `json:"latitude"`
-	Longitude float64  `json:"longitude"`
-	Timezone  string   `json:"timezone"`
-	Offset    float64  `json:"offset"`
-	Currently Current  `json:"currently"`
-	Minutely  Minutely `json:"minutely"`
-	Hourly    Hourly   `json:"hourly"`
-	Daily     Daily    `json:"daily"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+	Offset    int64   `json:"offset"`
+	Timezone  string  `json:"timezone"`
+	Currently struct {
+		ApparentTemperature  float64 `json:"apparentTemperature"`
+		CloudCover           float64 `json:"cloudCover"`
+		DewPoint             float64 `json:"dewPoint"`
+		Humidity             float64 `json:"humidity"`
+		Icon                 string  `json:"icon"`
+		NearestStormBearing  int     `json:"nearestStormBearing"`
+		NearestStormDistance int64   `json:"nearestStormDistance"`
+		Ozone                float64 `json:"ozone"`
+		PrecipIntensity      float64 `json:"precipIntensity"`
+		PrecipProbability    float64 `json:"precipProbability"`
+		Pressure             float64 `json:"pressure"`
+		Summary              string  `json:"summary"`
+		Temperature          float64 `json:"temperature"`
+		Time                 int64   `json:"time"`
+		Visibility           float64 `json:"visibility"`
+		WindBearing          int     `json:"windBearing"`
+		WindSpeed            float64 `json:"windSpeed"`
+	} `json:"currently"`
+	Minutely struct {
+		Data []struct {
+			PrecipIntensity   float64 `json:"precipIntensity"`
+			PrecipProbability float64 `json:"precipProbability"`
+			Time              int64   `json:"time"`
+		} `json:"data"`
+		Icon    string `json:"icon"`
+		Summary string `json:"summary"`
+	} `json:"minutely"`
+	Hourly struct {
+		Data []struct {
+			ApparentTemperature float64 `json:"apparentTemperature"`
+			CloudCover          float64 `json:"cloudCover"`
+			DewPoint            float64 `json:"dewPoint"`
+			Humidity            float64 `json:"humidity"`
+			Icon                string  `json:"icon"`
+			Ozone               float64 `json:"ozone"`
+			PrecipIntensity     float64 `json:"precipIntensity"`
+			PrecipProbability   float64 `json:"precipProbability"`
+			Pressure            float64 `json:"pressure"`
+			Summary             string  `json:"summary"`
+			Temperature         float64 `json:"temperature"`
+			Time                int64   `json:"time"`
+			Visibility          float64 `json:"visibility"`
+			WindBearing         int     `json:"windBearing"`
+			WindSpeed           float64 `json:"windSpeed"`
+		} `json:"data"`
+		Icon    string `json:"icon"`
+		Summary string `json:"summary"`
+	} `json:"hourly"`
+	Daily struct {
+		Data []struct {
+			ApparentTemperatureMax     float64 `json:"apparentTemperatureMax"`
+			ApparentTemperatureMaxTime int64   `json:"apparentTemperatureMaxTime"`
+			ApparentTemperatureMin     float64 `json:"apparentTemperatureMin"`
+			ApparentTemperatureMinTime int64   `json:"apparentTemperatureMinTime"`
+			CloudCover                 float64 `json:"cloudCover"`
+			DewPoint                   float64 `json:"dewPoint"`
+			Humidity                   float64 `json:"humidity"`
+			Icon                       string  `json:"icon"`
+			MoonPhase                  float64 `json:"moonPhase"`
+			Ozone                      float64 `json:"ozone"`
+			PrecipIntensity            float64 `json:"precipIntensity"`
+			PrecipIntensityMax         float64 `json:"precipIntensityMax"`
+			PrecipIntensityMaxTime     int64   `json:"precipIntensityMaxTime"`
+			PrecipProbability          float64 `json:"precipProbability"`
+			PrecipType                 string  `json:"precipType"`
+			Pressure                   float64 `json:"pressure"`
+			Summary                    string  `json:"summary"`
+			SunriseTime                int64   `json:"sunriseTime"`
+			SunsetTime                 int64   `json:"sunsetTime"`
+			TemperatureMax             float64 `json:"temperatureMax"`
+			TemperatureMaxTime         int64   `json:"temperatureMaxTime"`
+			TemperatureMin             float64 `json:"temperatureMin"`
+			TemperatureMinTime         int64   `json:"temperatureMinTime"`
+			Time                       int64   `json:"time"`
+			Visibility                 float64 `json:"visibility"`
+			WindBearing                int     `json:"windBearing"`
+			WindSpeed                  float64 `json:"windSpeed"`
+		} `json:"data"`
+		Icon    string `json:"icon"`
+		Summary string `json:"summary"`
+	} `json:"daily"`
+	Flags struct {
+		DarkskyStations []string `json:"darksky-stations"`
+		IsdStations     []string `json:"isd-stations"`
+		MadisStations   []string `json:"madis-stations"`
+		Sources         []string `json:"sources"`
+		Units           string   `json:"units"`
+	} `json:"flags"`
 }
 
 var cache *rcache.Cache
@@ -168,7 +221,7 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 						w.Currently.Summary)
 					s.Send(m)
 
-					m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fmph - Visibility %.2f Miles - Cloud Cover %d%% - Precipitation Probability %d%%",
+					m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fmph - Visibility %.2fmi - Cloud Cover %d%% - Precipitation Probability %d%%",
 						prefix, int(w.Currently.Humidity*100),
 						w.Currently.WindBearing, w.Currently.WindSpeed,
 						w.Currently.Visibility,

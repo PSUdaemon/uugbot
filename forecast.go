@@ -24,12 +24,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
+	"regexp"
 	"time"
 
 	"github.com/karlseguin/rcache"
 	"github.com/nickvanw/ircx"
 	"github.com/sorcix/irc"
+)
+
+var (
+	caZip   = regexp.MustCompile(`^([ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1}) ?\d{1}[A-Z]{1}\d{1}$`)
+	usZip   = regexp.MustCompile(`^(\d{5})(-\d{4})?$`)
+	causZip = regexp.MustCompile(`(^\d{5}(-\d{4})?$)|(^[ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1} ?\d{1}[A-Z]{1}\d{1}$)`)
 )
 
 type ZipInfo struct {
@@ -145,9 +151,18 @@ var cache *rcache.Cache
 
 func fetcher(key string) interface{} {
 	var z ZipInfo
+	var err error
+	var resp *http.Response
 
-	log.Println("Looking up coordinates for zip:", key)
-	resp, err := http.Get(fmt.Sprintf("http://api.zippopotam.us/us/%s", key))
+	if usZip.MatchString(key) {
+		zip := usZip.FindStringSubmatch(key)[1]
+		log.Println("Looking up coordinates for US zip:", zip)
+		resp, err = http.Get(fmt.Sprintf("http://api.zippopotam.us/us/%s", zip))
+	} else if caZip.MatchString(key) {
+		zip := caZip.FindStringSubmatch(key)[1]
+		log.Println("Looking up coordinates for CA postal code:", zip)
+		resp, err = http.Get(fmt.Sprintf("http://api.zippopotam.us/ca/%s", zip))
+	}
 
 	if err != nil {
 		log.Printf("Lookup failed for zip: %s (%s)\n", key, err)
@@ -171,67 +186,65 @@ func init() {
 }
 
 func GetWeather(s ircx.Sender, message *irc.Message) {
-	if len(message.Trailing) == 5 {
-		if _, err := strconv.Atoi(message.Trailing); err == nil {
-			var p []string
-			var prefix string
+	if causZip.MatchString(message.Trailing) {
+		var p []string
+		var prefix string
 
-			if message.Params[0] == config.General.Name {
-				p = []string{message.Prefix.Name}
-			} else {
-				p = message.Params
-				prefix = fmt.Sprint(message.Prefix.Name, ": ")
-			}
+		if message.Params[0] == config.General.Name {
+			p = []string{message.Prefix.Name}
+		} else {
+			p = message.Params
+			prefix = fmt.Sprint(message.Prefix.Name, ": ")
+		}
 
-			m := &irc.Message{
-				Command: irc.PRIVMSG,
-				Params:  p,
-			}
+		m := &irc.Message{
+			Command: irc.PRIVMSG,
+			Params:  p,
+		}
 
-			zl := cache.Get(message.Trailing)
+		zl := cache.Get(message.Trailing)
 
-			if zl != nil {
-				z := zl.(*ZipInfo)
-				if z.Places != nil {
-					resp, err := http.Get(fmt.Sprintf("https://api.forecast.io/forecast/%s/%.4f,%.4f?exclude=flags",
-						config.Forecast.Key, z.Places[0].Latitude, z.Places[0].Longitude))
-					if err != nil {
-						// handle error
-						return
-					}
-					defer resp.Body.Close()
-
-					dec := json.NewDecoder(resp.Body)
-
-					var w WeatherReport
-					err = dec.Decode(&w)
-
-					l, _ := time.LoadLocation(w.Timezone)
-
-					t := time.Unix(w.Currently.Time, 0).In(l)
-
-					log.Println("Sending weather for", message.Trailing)
-
-					m.Trailing = fmt.Sprintf("%s%s, %s (%.4f, %.4f) %s - %.2f°F (feels like %.2f°F) - %s",
-						prefix, z.Places[0].PlaceName, z.Places[0].StateAbbr,
-						z.Places[0].Latitude, z.Places[0].Longitude, t,
-						w.Currently.Temperature, w.Currently.ApparentTemperature,
-						w.Currently.Summary)
-					s.Send(m)
-
-					m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fmph - Visibility %.2fmi - Cloud Cover %d%% - Precipitation Probability %d%%",
-						prefix, int(w.Currently.Humidity*100),
-						w.Currently.WindBearing, w.Currently.WindSpeed,
-						w.Currently.Visibility,
-						int(w.Currently.CloudCover*100),
-						int(w.Currently.PrecipProbability*100))
-					s.Send(m)
-
-					m.Trailing = fmt.Sprintf("%s%s %s %s", prefix, w.Minutely.Summary, w.Hourly.Summary, w.Daily.Summary)
-					s.Send(m)
-				} else {
-					log.Println("No data returned for zip:", message.Trailing)
+		if zl != nil {
+			z := zl.(*ZipInfo)
+			if z.Places != nil {
+				resp, err := http.Get(fmt.Sprintf("https://api.forecast.io/forecast/%s/%.4f,%.4f?exclude=flags",
+					config.Forecast.Key, z.Places[0].Latitude, z.Places[0].Longitude))
+				if err != nil {
+					// handle error
+					return
 				}
+				defer resp.Body.Close()
+
+				dec := json.NewDecoder(resp.Body)
+
+				var w WeatherReport
+				err = dec.Decode(&w)
+
+				l, _ := time.LoadLocation(w.Timezone)
+
+				t := time.Unix(w.Currently.Time, 0).In(l)
+
+				log.Println("Sending weather for", message.Trailing)
+
+				m.Trailing = fmt.Sprintf("%s%s, %s (%.4f, %.4f) %s - %.2f°F (feels like %.2f°F) - %s",
+					prefix, z.Places[0].PlaceName, z.Places[0].StateAbbr,
+					z.Places[0].Latitude, z.Places[0].Longitude, t,
+					w.Currently.Temperature, w.Currently.ApparentTemperature,
+					w.Currently.Summary)
+				s.Send(m)
+
+				m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fmph - Visibility %.2fmi - Cloud Cover %d%% - Precipitation Probability %d%%",
+					prefix, int(w.Currently.Humidity*100),
+					w.Currently.WindBearing, w.Currently.WindSpeed,
+					w.Currently.Visibility,
+					int(w.Currently.CloudCover*100),
+					int(w.Currently.PrecipProbability*100))
+				s.Send(m)
+
+				m.Trailing = fmt.Sprintf("%s%s %s %s", prefix, w.Minutely.Summary, w.Hourly.Summary, w.Daily.Summary)
+				s.Send(m)
+			} else {
+				log.Println("No data returned for zip:", message.Trailing)
 			}
 		}
 	}

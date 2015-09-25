@@ -32,12 +32,6 @@ import (
 	"github.com/sorcix/irc"
 )
 
-var (
-	caZip   = regexp.MustCompile(`^([ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1}) ?\d{1}[A-Z]{1}\d{1}$`)
-	usZip   = regexp.MustCompile(`^(\d{5})(-\d{4})?$`)
-	causZip = regexp.MustCompile(`(^\d{5}(-\d{4})?$)|(^[ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1} ?\d{1}[A-Z]{1}\d{1}$)`)
-)
-
 type ZipInfo struct {
 	Country     string `json:"country"`
 	CountryAbbr string `json:"country abbreviation"`
@@ -147,8 +141,6 @@ type WeatherReport struct {
 	} `json:"flags"`
 }
 
-var cache *rcache.Cache
-
 func fetcher(key string) interface{} {
 	var z ZipInfo
 	var err error
@@ -181,9 +173,12 @@ func fetcher(key string) interface{} {
 	return &z
 }
 
-func init() {
-	cache = rcache.New(fetcher, time.Hour*24*7)
-}
+var (
+	caZip   = regexp.MustCompile(`^([ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1}) ?\d{1}[A-Z]{1}\d{1}$`)
+	usZip   = regexp.MustCompile(`^(\d{5})(-\d{4})?$`)
+	causZip = regexp.MustCompile(`(^\d{5}(-\d{4})?$)|(^[ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1} ?\d{1}[A-Z]{1}\d{1}$)`)
+	cache   = rcache.New(fetcher, time.Hour*24*7)
+)
 
 func GetWeather(s ircx.Sender, message *irc.Message) {
 	if causZip.MatchString(message.Trailing) {

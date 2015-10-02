@@ -49,7 +49,9 @@ type Config struct {
 			Pass string
 		}
 	}
-	Forecast struct{ Key string }
+	Forecast struct {
+		Key string
+	}
 }
 
 func RegisterHandlers(bot *ircx.Bot) {

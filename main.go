@@ -40,19 +40,15 @@ func init() {
 	flag.Parse()
 }
 
-type Channel struct {
-	Name string
-	Pass string
-}
-
-type BotConfig struct {
-	Name     string
-	Server   string
-	Channels []Channel
-}
-
 type Config struct {
-	General  BotConfig
+	General struct {
+		Name     string
+		Server   string
+		Channels []struct {
+			Name string
+			Pass string
+		}
+	}
 	Forecast struct{ Key string }
 }
 

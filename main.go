@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"runtime"
 
 	"github.com/nickvanw/ircx"
 	"github.com/sorcix/irc"
@@ -58,14 +57,12 @@ type Config struct {
 }
 
 func RegisterHandlers(bot *ircx.Bot) {
-	bot.AddCallback(irc.RPL_WELCOME, ircx.Callback{Handler: ircx.HandlerFunc(RegisterConnect)})
-	bot.AddCallback(irc.PING, ircx.Callback{Handler: ircx.HandlerFunc(PingHandler)})
-	bot.AddCallback(irc.PRIVMSG, ircx.Callback{Handler: ircx.HandlerFunc(PrivMsgHandler)})
+	bot.HandleFunc(irc.RPL_WELCOME, RegisterConnect)
+	bot.HandleFunc(irc.PING, PingHandler)
+	bot.HandleFunc(irc.PRIVMSG, PrivMsgHandler)
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	b, err := ioutil.ReadFile(*configfile)
 
 	if err != nil {
@@ -86,7 +83,7 @@ func main() {
 	}
 
 	RegisterHandlers(bot)
-	bot.CallbackLoop()
+	bot.HandleLoop()
 	log.Println("Exiting..")
 }
 

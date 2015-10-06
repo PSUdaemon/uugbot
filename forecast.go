@@ -217,15 +217,15 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 
 				l, _ := time.LoadLocation(w.Timezone)
 
-				t := time.Unix(w.Currently.Time, 0).In(l)
-
 				log.Println("Sending weather for", message.Trailing)
 
-				m.Trailing = fmt.Sprintf("%s%s, %s (%.4f, %.4f) %s - %.2f°F (feels like %.2f°F) - %s",
+				m.Trailing = fmt.Sprintf("%s%s, %s (%.4f, %.4f) %s - %.2f°F (feels like %.2f°F) - %s - Sunrise: %s Sunset: %s",
 					prefix, z.Places[0].PlaceName, z.Places[0].StateAbbr,
-					z.Places[0].Latitude, z.Places[0].Longitude, t,
+					z.Places[0].Latitude, z.Places[0].Longitude, time.Unix(w.Currently.Time, 0).In(l),
 					w.Currently.Temperature, w.Currently.ApparentTemperature,
-					w.Currently.Summary)
+					w.Currently.Summary,
+					time.Unix(w.Daily.Data[0].SunriseTime, 0).In(l).Format(time.Kitchen),
+					time.Unix(w.Daily.Data[0].SunsetTime, 0).In(l).Format(time.Kitchen))
 				s.Send(m)
 
 				m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fmph - Visibility %.2fmi - Cloud Cover %d%% - Precipitation Probability %d%%",

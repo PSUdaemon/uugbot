@@ -1,0 +1,5 @@
+{{template "nick" .}}{{"             "}}{{template "conditions" .}}
+{{template "nick" .}}{{"\033[38;5;240;1m     .--.    \033[0m"}}{{template "temp" .}}
+{{template "nick" .}}{{"\033[38;5;240;1m  .-(    ).  \033[0m"}}{{template "wind" .}}
+{{template "nick" .}}{{"\033[38;5;240;1m (___.__)__) \033[0m"}}{{template "visibility" .}}
+{{template "nick" .}}{{"             "}}{{template "other" .}}

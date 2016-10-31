@@ -1,0 +1,5 @@
+{{template "nick" .}}{{"    .-.      "}}{{template "conditions" .}}
+{{template "nick" .}}{{"     __)     "}}{{template "temp" .}}
+{{template "nick" .}}{{"    (        "}}{{template "wind" .}}
+{{template "nick" .}}{{"     `-᾿     "}}{{template "visibility" .}}
+{{template "nick" .}}{{"      •      "}}{{template "other" .}}

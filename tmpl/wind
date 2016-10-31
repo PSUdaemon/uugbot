@@ -1,0 +1,23 @@
+ {{ if lt .WindDirection 0 -}}
+?
+{{- else if le .WindDirection 22 -}}
+↓
+{{- else if le .WindDirection 67 -}}
+↙
+{{- else if le .WindDirection 112 -}}
+←
+{{- else if le .WindDirection 157 -}}
+↖
+{{- else if le .WindDirection 202 -}}
+↑
+{{- else if le .WindDirection 247 -}}
+↗
+{{- else if le .WindDirection 292 -}}
+→
+{{- else if le .WindDirection 337 -}}
+↘
+{{- else if le .WindDirection 360 -}}
+↓
+{{- else -}}
+?
+{{- end }} {{printf "%0.2f" .WindSpeed}} {{.WindUnits -}}

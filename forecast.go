@@ -20,11 +20,14 @@ under the License.
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"regexp"
+	"text/template"
 	"time"
 
 	"github.com/karlseguin/rcache"
@@ -140,6 +143,28 @@ type WeatherReport struct {
 	} `json:"flags"`
 }
 
+type TemplateForecast struct {
+	Nick             string
+	CurrentCond      string
+	Temp             float64
+	ApparentTemp     float64
+	TempUnits        string
+	WindDirection    int
+	WindSpeed        float64
+	WindUnits        string
+	Visibility       float64
+	VisibilityUnits  string
+	Pressure         float64
+	PressureUnits    string
+	RelativeHumidity int
+	CloudCover       int
+	PrecipProb       int
+	Sunrise          string
+	Sunset           string
+	LocationName     string
+	LocationState    string
+}
+
 func fetcher(key string) interface{} {
 	var z ZipInfo
 	var err error
@@ -173,10 +198,26 @@ func fetcher(key string) interface{} {
 }
 
 var (
-	caZip   = regexp.MustCompile(`^([ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1}) ?\d{1}[A-Z]{1}\d{1}$`)
-	usZip   = regexp.MustCompile(`^(\d{5})(-\d{4})?$`)
-	causZip = regexp.MustCompile(`(^\d{5}(-\d{4})?$)|(^[ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1} ?\d{1}[A-Z]{1}\d{1}$)`)
-	cache   = rcache.New(fetcher, time.Hour*24*7)
+	caZip       = regexp.MustCompile(`^([ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1}) ?\d{1}[A-Z]{1}\d{1}$`)
+	usZip       = regexp.MustCompile(`^(\d{5})(-\d{4})?$`)
+	causZip     = regexp.MustCompile(`(^\d{5}(-\d{4})?$)|(^[ABCEGHJKLMNPRSTVXY]{1}\d{1}[A-Z]{1} ?\d{1}[A-Z]{1}\d{1}$)`)
+	cache       = rcache.New(fetcher, time.Hour*24*7)
+	tmpl        = template.Must(template.ParseGlob("tmpl/*"))
+	icon_lookup = map[string]string{
+		"clear-day":           "Sunny",
+		"clear-night":         "Sunny",
+		"rain":                "LightRain",
+		"snow":                "LightSnow",
+		"sleet":               "LightSleet",
+		"wind":                "PartlyCloudy",
+		"fog":                 "Fog",
+		"cloudy":              "Cloudy",
+		"partly-cloudy-day":   "PartlyCloudy",
+		"partly-cloudy-night": "PartlyCloudy",
+		"hail":                "Unknown",
+		"thunderstorm":        "ThunderyShowers",
+		"tornado":             "Unknown",
+	}
 )
 
 func GetWeather(e irc.Encoder, message *irc.Message) {
@@ -188,7 +229,7 @@ func GetWeather(e irc.Encoder, message *irc.Message) {
 			p = []string{message.Prefix.Name}
 		} else {
 			p = message.Params
-			prefix = fmt.Sprint(message.Prefix.Name, ": ")
+			prefix = message.Prefix.Name
 		}
 
 		m := &irc.Message{
@@ -218,24 +259,37 @@ func GetWeather(e irc.Encoder, message *irc.Message) {
 
 				log.Println("Sending weather for", message.Trailing)
 
-				m.Trailing = fmt.Sprintf("%s%s, %s - %.2f°F (feels like %.2f°F) - %s - Sunrise: %s Sunset: %s",
-					prefix, z.Places[0].PlaceName, z.Places[0].StateAbbr,
-					w.Currently.Temperature, w.Currently.ApparentTemperature,
-					w.Currently.Summary,
-					time.Unix(w.Daily.Data[0].SunriseTime, 0).In(l).Format(time.Kitchen),
-					time.Unix(w.Daily.Data[0].SunsetTime, 0).In(l).Format(time.Kitchen))
-				e.Encode(m)
+				forecast := &TemplateForecast{
+					Nick:             prefix,
+					CurrentCond:      w.Currently.Summary,
+					Temp:             w.Currently.Temperature,
+					ApparentTemp:     w.Currently.ApparentTemperature,
+					TempUnits:        "F",
+					WindDirection:    w.Currently.WindBearing,
+					WindSpeed:        w.Currently.WindSpeed,
+					WindUnits:        "mph",
+					Visibility:       w.Currently.Visibility,
+					VisibilityUnits:  "mi",
+					Pressure:         w.Currently.Pressure,
+					PressureUnits:    "mbar",
+					RelativeHumidity: int(w.Currently.Humidity * 100),
+					CloudCover:       int(w.Currently.CloudCover * 100),
+					PrecipProb:       int(w.Currently.PrecipProbability * 100),
+					Sunrise:          time.Unix(w.Daily.Data[0].SunriseTime, 0).In(l).Format(time.Kitchen),
+					Sunset:           time.Unix(w.Daily.Data[0].SunsetTime, 0).In(l).Format(time.Kitchen),
+					LocationName:     z.Places[0].PlaceName,
+					LocationState:    z.Places[0].StateAbbr,
+				}
 
-				m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fmph - Visibility %.2fmi - Cloud Cover %d%% - Precipitation Probability %d%%",
-					prefix, int(w.Currently.Humidity*100),
-					w.Currently.WindBearing, w.Currently.WindSpeed,
-					w.Currently.Visibility,
-					int(w.Currently.CloudCover*100),
-					int(w.Currently.PrecipProbability*100))
-				e.Encode(m)
+				var buffer bytes.Buffer
 
-				m.Trailing = fmt.Sprintf("%s%s %s %s", prefix, w.Minutely.Summary, w.Hourly.Summary, w.Daily.Summary)
-				e.Encode(m)
+				tmpl.ExecuteTemplate(&buffer, icon_lookup[w.Currently.Icon], forecast)
+				scanner := bufio.NewScanner(&buffer)
+
+				for scanner.Scan() {
+					m.Trailing = scanner.Text()
+					e.Encode(m)
+				}
 			} else {
 				log.Println("No data returned for zip:", message.Trailing)
 			}

@@ -26,13 +26,12 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/nickvanw/ircx"
-	"github.com/sorcix/irc"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
+	"gopkg.in/sorcix/irc.v1"
 )
 
-func getURL(s ircx.Sender, message *irc.Message, word string) {
+func getURL(e irc.Encoder, message *irc.Message, word string) {
 	if url, err := url.Parse(word); err == nil && strings.HasPrefix(url.Scheme, "http") {
 		resp, err := http.Head(url.String())
 		if err == nil {
@@ -52,14 +51,14 @@ func getURL(s ircx.Sender, message *irc.Message, word string) {
 								tt = z.Next()
 								if tt == html.TextToken {
 									p := message.Params
-									if p[0] == config.General.Name {
+									if p[0] == config.General.Nick {
 										p = []string{message.Prefix.Name}
 									}
 
 									title := fmt.Sprintf("Title: %s", strings.TrimSpace(strings.Replace(z.Token().Data, "\n", "", -1)))
 
 									log.Println("Sending HTML", title)
-									s.Send(&irc.Message{
+									e.Encode(&irc.Message{
 										Command:  irc.PRIVMSG,
 										Params:   p,
 										Trailing: title,
@@ -76,9 +75,9 @@ func getURL(s ircx.Sender, message *irc.Message, word string) {
 	}
 }
 
-func GetTitle(s ircx.Sender, message *irc.Message) {
+func GetTitle(e irc.Encoder, message *irc.Message) {
 	words := strings.Split(message.Trailing, " ")
 	for _, word := range words {
-		go getURL(s, message, word)
+		go getURL(e, message, word)
 	}
 }

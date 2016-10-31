@@ -28,8 +28,7 @@ import (
 	"time"
 
 	"github.com/karlseguin/rcache"
-	"github.com/nickvanw/ircx"
-	"github.com/sorcix/irc"
+	"gopkg.in/sorcix/irc.v1"
 )
 
 type ZipInfo struct {
@@ -180,12 +179,12 @@ var (
 	cache   = rcache.New(fetcher, time.Hour*24*7)
 )
 
-func GetWeather(s ircx.Sender, message *irc.Message) {
+func GetWeather(e irc.Encoder, message *irc.Message) {
 	if causZip.MatchString(message.Trailing) {
 		var p []string
 		var prefix string
 
-		if message.Params[0] == config.General.Name {
+		if message.Params[0] == config.General.Nick {
 			p = []string{message.Prefix.Name}
 		} else {
 			p = message.Params
@@ -225,7 +224,7 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 					w.Currently.Summary,
 					time.Unix(w.Daily.Data[0].SunriseTime, 0).In(l).Format(time.Kitchen),
 					time.Unix(w.Daily.Data[0].SunsetTime, 0).In(l).Format(time.Kitchen))
-				s.Send(m)
+				e.Encode(m)
 
 				m.Trailing = fmt.Sprintf("%s%d%% Humidity - Wind from %d° at %.2fmph - Visibility %.2fmi - Cloud Cover %d%% - Precipitation Probability %d%%",
 					prefix, int(w.Currently.Humidity*100),
@@ -233,10 +232,10 @@ func GetWeather(s ircx.Sender, message *irc.Message) {
 					w.Currently.Visibility,
 					int(w.Currently.CloudCover*100),
 					int(w.Currently.PrecipProbability*100))
-				s.Send(m)
+				e.Encode(m)
 
 				m.Trailing = fmt.Sprintf("%s%s %s %s", prefix, w.Minutely.Summary, w.Hourly.Summary, w.Daily.Summary)
-				s.Send(m)
+				e.Encode(m)
 			} else {
 				log.Println("No data returned for zip:", message.Trailing)
 			}

@@ -25,9 +25,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 
-	"github.com/nickvanw/ircx"
-	"github.com/sorcix/irc"
+	"gopkg.in/sorcix/irc.v1"
 	"gopkg.in/yaml.v2"
 )
 
@@ -42,7 +42,7 @@ func init() {
 
 type Config struct {
 	General struct {
-		Name     string
+		Nick     string
 		Server   string
 		Channels []struct {
 			Name string
@@ -54,13 +54,9 @@ type Config struct {
 	}
 }
 
-func RegisterHandlers(bot *ircx.Bot) {
-	bot.HandleFunc(irc.RPL_WELCOME, RegisterConnect)
-	bot.HandleFunc(irc.PING, PingHandler)
-	bot.HandleFunc(irc.PRIVMSG, PrivMsgHandler)
-}
-
 func main() {
+	var server_conn *irc.Conn
+
 	b, err := ioutil.ReadFile(*configfile)
 
 	if err != nil {
@@ -75,34 +71,72 @@ func main() {
 		os.Exit(1)
 	}
 
-	bot := ircx.Classic(config.General.Server, config.General.Name)
-	if err := bot.Connect(); err != nil {
-		log.Panicln("Unable to dial IRC Server ", err)
-	}
+	log.Println(config)
 
-	RegisterHandlers(bot)
-	bot.HandleLoop()
-	log.Println("Exiting..")
-}
+	for {
+		var m *irc.Message
+		var e error
 
-func PingHandler(s ircx.Sender, m *irc.Message) {
-	s.Send(&irc.Message{
-		Command:  irc.PONG,
-		Params:   m.Params,
-		Trailing: m.Trailing,
-	})
-}
+		for server_conn == nil {
+			server_conn, err = irc.Dial(config.General.Server)
+			if e != nil {
+				log.Println(e.Error())
+				server_conn = nil
+				time.Sleep(10 * time.Second)
+			}
+		}
 
-func RegisterConnect(s ircx.Sender, m *irc.Message) {
-	for _, irc_chan := range config.General.Channels {
-		s.Send(&irc.Message{
-			Command: irc.JOIN,
-			Params:  []string{irc_chan.Name, irc_chan.Pass},
+		log.Println("Connected to Server")
+		log.Println("Sending Nick")
+		server_conn.Encode(&irc.Message{
+			Command: irc.NICK,
+			Params:  []string{config.General.Nick},
 		})
-	}
-}
 
-func PrivMsgHandler(s ircx.Sender, message *irc.Message) {
-	go GetWeather(s, message)
-	go GetTitle(s, message)
+		log.Println("Sending User")
+		server_conn.Encode(&irc.Message{
+			Command:  irc.USER,
+			Params:   []string{config.General.Nick, "0", "*"},
+			Trailing: config.General.Nick,
+		})
+
+		for {
+			m, e = server_conn.Decode()
+			if e == nil {
+				switch m.Command {
+				case irc.PING:
+					log.Println("Received PING")
+					server_conn.Encode(&irc.Message{
+						Command:  irc.PONG,
+						Params:   m.Params,
+						Trailing: m.Trailing,
+					})
+				case irc.RPL_WELCOME:
+					log.Println("Received Welcome")
+					for _, irc_chan := range config.General.Channels {
+						log.Println("Joining ", irc_chan.Name)
+						server_conn.Encode(&irc.Message{
+							Command: irc.JOIN,
+							Params:  []string{irc_chan.Name, irc_chan.Pass},
+						})
+					}
+				case irc.PRIVMSG:
+					log.Println("Received PRIVMSG")
+					go GetWeather(server_conn.Encoder, m)
+					go GetTitle(server_conn.Encoder, m)
+				default:
+					log.Println(m)
+				}
+			} else {
+				log.Println(e.Error())
+				e = server_conn.Close()
+				if e != nil {
+					log.Println(e.Error())
+				}
+				server_conn = nil
+				break
+			}
+		}
+	}
+	log.Println("Exiting..")
 }

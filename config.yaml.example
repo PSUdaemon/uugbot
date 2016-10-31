@@ -1,5 +1,5 @@
 general:
-  name: UUGBot
+  nick: UUGBot
   server: irc.freenode.net:6667
   channels:
     - name: "#foo"

@@ -283,7 +283,11 @@ func GetWeather(e irc.Encoder, message *irc.Message) {
 
 				var buffer bytes.Buffer
 
-				tmpl.ExecuteTemplate(&buffer, icon_lookup[w.Currently.Icon], forecast)
+				tmpl_name, ok := icon_lookup[w.Currently.Icon]
+				if !ok {
+					tmpl_name = "Unknown"
+				}
+				tmpl.ExecuteTemplate(&buffer, tmpl_name, forecast)
 				scanner := bufio.NewScanner(&buffer)
 
 				for scanner.Scan() {
